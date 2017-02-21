@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+import boto3
+import json
+import re
+from optparse import OptionParser
+
+def validate_options(**kwargs):
+    print("opts:{}".format(kwargs['args']))
+
+def print_result(command=None, result=None):
+    print("======================")
+    print("{}".format(command))
+    print("======================")
+    print("{}".format(result))
+
+def match_pattern(message=None, expect=None, regex=None):
+    if regex:
+        reprog = re.compile(regex)
+        result = reprog.match(message)
+        if result:
+            print(result)
+            if expect and not expect == result.group(0):
+                return False
+            return True
+        else:
+            return False
+    if expect and type(expect) == str and message == expect:
+        return True
+
+
+def main():
+    parser = OptionParser()
+
+    parser.add_option("-q", "--queue", dest="queue",
+                      help="SQS Queue URL")
+
+    parser.add_option("--access-key", dest="access_key",
+                      help="AWS access key")
+
+    parser.add_option("--secret-key", dest="secret_key",
+                      help="AWS secret key")
+
+    parser.add_option("--session-token", dest="session_token",
+                      help="AWS session token")
+
+    parser.add_option("--region", dest="region",
+                      help="region")
+
+    parser.add_option("-t","--timeout", dest="timeout", default=10,
+                      help="action timeout")
+
+    parser.add_option("-e", "--expect", dest="expect",
+                      help="expected message string in json string")
+
+    parser.add_option("-r", "--regex", dest="regex",
+                      help="message regular expression match")
+
+    parser.add_option("-d", "--debug",
+                      action="store_true", dest="debug", default=False,
+                      help="print status messages to stdout")
+
+    parser.add_option("-p", "--purge",
+                      action="store_true", dest="purge", default=False,
+                      help="purge the message in queue by delete 1 by 1")
+
+    parser.add_option("--pb", "--purge_before",
+                      action="store_true", dest="purge_before", default=False,
+                      help="purge the message in queue before any action")
+
+    parser.add_option("--pa", "--purge_after",
+                      action="store_true", dest="purge_after", default=False,
+                      help="purge the message in queue after any action")
+
+    parser.add_option("-v", "--validate",
+                      action="store_true", dest="validate", default=False,
+                      help="validate message enqueued")
+
+    (options, args) = parser.parse_args()
+    #validate_options(args=options)
+    
+    sqs = boto3.client('sqs', aws_access_key_id=options.access_key, aws_secret_access_key=options.secret_key, aws_session_token=options.session_token)
+    result = True
+
+    if options.purge_before:
+        print("pruge before action! make sure NOT purge again in 1 min")
+        response = sqs.purge_queue(
+            QueueUrl=options.queue
+        )
+        #print_result(command="purge queue", result=response)
+
+    if options.validate or options.purge:
+        response = sqs.receive_message(
+            QueueUrl=options.queue,
+            WaitTimeSeconds=int(options.timeout)
+        )
+        if options.expect:
+            try:
+                expect_string = json.loads(options.expect)
+            except json.JSONDecodeError:
+                expect_string = options.expect
+        msg_count = 0
+        if 'Messages' in response:
+            #print(response)
+            for msg in response['Messages']:
+                msg_count += 1
+                #match_pattern(message=msg['Body'], expect=expect_string, regex=options.regex)
+                if options.purge:
+                    sqs.delete_message(QueueUrl=options.queue, ReceiptHandle=msg['ReceiptHandle'])
+            print(msg_count)
+
+        if msg_count == 0 and options.validate:
+            result = False
+
+    if options.purge_after:
+        print("pruge after action! make sure NOT purge again in 1 min")
+        response = sqs.purge_queue(
+            QueueUrl=options.queue
+        )
+
+    return result
+
+if __name__ == '__main__':
+    if main():
+        exit(0)
+    else:
+        exit(1)
