@@ -1,0 +1,48 @@
+[ ca ]
+default_ca  = CA_default        # The default ca section
+
+[ CA_default ]
+
+dir     = ./CA
+certs       = $dir/certs
+crl_dir     = $dir/crl
+database    = $dir/index.txt
+new_certs_dir   = $dir/newcerts
+
+certificate = $dir/cacert.pem
+serial      = $dir/serial
+crlnumber   = $dir/crlnumber
+crl         = $dir/crl.pem
+private_key = $dir/private/cakey.pem
+RANDFILE    = $dir/private/.rand
+
+x509_extensions = usr_cert
+
+name_opt    = ca_default        # Subject Name options
+cert_opt    = ca_default        # Certificate field options
+
+default_days    = 365           # how long to certify for
+
+
+[req]
+prompt = no
+default_bits = 2048
+req_extensions = v3_req
+distinguished_name = req_distinguished_name
+
+[req_distinguished_name]
+countryName = TW
+stateOrProvinceName = Taipei
+organizationalUnitName = Elasticservice .co
+commonName = *.elasticservice.co
+
+[ v3_req ]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+subjectAltName = @alt_names
+#crlDistributionPoints=URI:http://www.elasticservice.co/crl.pem
+
+[alt_names]
+DNS.1 = *.elasticservice.co
+DNS.2 = www.elasticsearch.co
+IP.1 = 127.0.0.1
